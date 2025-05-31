@@ -212,3 +212,69 @@
     )
   )
 )
+
+;; Protocol Configuration
+
+;; Update price oracle address
+(define-public (set-oracle-address (new-address principal))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (not (is-eq new-address (var-get oracle-address)))
+      err-invalid-parameter
+    )
+    (ok (var-set oracle-address new-address))
+  )
+)
+
+;; Configure minimum position size
+(define-public (set-minimum-stake (new-minimum uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (> new-minimum u0) err-invalid-parameter)
+    (ok (var-set minimum-stake new-minimum))
+  )
+)
+
+;; Adjust protocol fee percentage
+(define-public (set-fee-percentage (new-fee uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (<= new-fee u100) err-invalid-parameter)
+    (ok (var-set fee-percentage new-fee))
+  )
+)
+
+;; Withdraw protocol revenue
+(define-public (withdraw-fees (amount uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (<= amount (stx-get-balance (as-contract tx-sender)))
+      err-insufficient-balance
+    )
+    (try! (as-contract (stx-transfer? amount (as-contract tx-sender) contract-owner)))
+    (ok amount)
+  )
+)
+
+;; Read-Only Functions
+
+;; Get market parameters
+(define-read-only (get-market (market-id uint))
+  (map-get? markets market-id)
+)
+
+;; Get user position details
+(define-read-only (get-user-prediction
+    (market-id uint)
+    (user principal)
+  )
+  (map-get? user-predictions {
+    market-id: market-id,
+    user: user,
+  })
+)
+
+;; Check contract STX balance
+(define-read-only (get-contract-balance)
+  (stx-get-balance (as-contract tx-sender))
+)
