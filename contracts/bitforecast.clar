@@ -48,3 +48,62 @@
     resolved: bool, ;; Settlement status
   }
 )
+
+;; User positions - tracks individual positions and claim status
+(define-map user-predictions
+  {
+    market-id: uint,
+    user: principal,
+  }
+  {
+    prediction: (string-ascii 4), ;; "up" or "down"
+    stake: uint, ;; STX committed
+    claimed: bool, ;; Reward status
+  }
+)
+
+;; Market Administration
+
+;; Create a new Bitcoin price prediction market
+(define-public (create-market
+    (start-price uint)
+    (start-block uint)
+    (end-block uint)
+  )
+  (let ((market-id (var-get market-counter)))
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (> end-block start-block) err-invalid-parameter)
+    (asserts! (> start-price u0) err-invalid-parameter)
+    (map-set markets market-id {
+      start-price: start-price,
+      end-price: u0,
+      total-up-stake: u0,
+      total-down-stake: u0,
+      start-block: start-block,
+      end-block: end-block,
+      resolved: false,
+    })
+    (var-set market-counter (+ market-id u1))
+    (ok market-id)
+  )
+)
+
+;; Finalize market with oracle-provided price
+(define-public (resolve-market
+    (market-id uint)
+    (end-price uint)
+  )
+  (let ((market (unwrap! (map-get? markets market-id) err-not-found)))
+    (asserts! (is-eq tx-sender (var-get oracle-address)) err-owner-only)
+    (asserts! (>= stacks-block-height (get end-block market)) err-market-ended)
+    (asserts! (not (get resolved market)) err-market-already-resolved)
+    (asserts! (> end-price u0) err-invalid-parameter)
+    (map-set markets market-id
+      (merge market {
+        end-price: end-price,
+        resolved: true,
+      })
+    )
+    (ok true)
+  )
+)
